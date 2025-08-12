@@ -94,6 +94,8 @@ def get_bioclim_rasters(base_dir=paths.RASTERS, train_dir=paths.RASTERS, ras_nam
     # first, get raster files
     ras_paths = load_rasters(base_dir, timeframe, ras_name)
     # sort rasters to same order as training rasters
+    #TODO: use raster_order from model metadata.json to sort the rasters
+    # as opposed to having to glob from the original directory
     ras_paths = sort_rasters(training_ras, ras_paths)
     # get means from bioclim used to train the model
     means, stds = get_bioclim_means(training_ras, shpfile, crs)
