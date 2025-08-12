@@ -43,7 +43,7 @@ GKS = 5
 
 
 # ---------- Static Types ---------- #
-    
+
 # choices=['bioclim', 'naip', 'joint_naip_bioclim']
 class DataType(Enum, metaclass=utils.MetaEnum):
     BIOCLIM = 'bioclim'
@@ -55,8 +55,8 @@ class DatasetType(Enum, metaclass=utils.MetaEnum):
     MULTI_SPECIES = 'multi_species'
     SINGLE_SPECIES = 'single_species'
     SINGLE_LABEL = 'single_label'
-    
-    
+
+
 # ---------- Data augmentations ---------- #
 
 def random_augment(self,img):
@@ -107,10 +107,10 @@ def fivecrop_augment(img):
 # To use these types...
 # valid augments
 class Augment(utils.FuncEnum, metaclass=utils.MetaEnum):
-    
+
     NONE = partial(utils.pass_)
     RANDOM = partial(random_augment)
-    FIVECROP = partial(fivecrop_augment)    
+    FIVECROP = partial(fivecrop_augment)
 
 # gross but pandas stores lists in csvs
 # as strings, so need to unread that string
@@ -147,7 +147,7 @@ def load_metadata(dataset_name, parent_dir=None):
     else:
         path = f"{parent_dir}{dataset_name}_metadata.json"
     return SimpleNamespace(**json.load(open(path, 'r')))
- 
+
 def get_onehot(species_id, genus_id, family_id, nspec, ngen, nfam):
     all_specs, all_gens, all_fams = [], [], []
     for spids, gids, fids in zip(species_id, genus_id, family_id):
@@ -165,7 +165,7 @@ def get_onehot(species_id, genus_id, family_id, nspec, ngen, nfam):
     all_fams = torch.tensor(np.stack(all_fams))
     return all_specs, all_gens, all_fams
 
-    
+
 def get_specnames(metadata):
     # sort 0-N
     sortd = sorted(metadata.spec_2_id.items(), key = lambda x: x[1])
@@ -181,9 +181,9 @@ def check_bioclim(daset, metadata, state):
         return torch.tensor(daset[bio_cols].values), bio_cols # self.bioclim
     else:
         return load_bioclim(daset, metadata, state, ras_names=True)
-        
-        
-def load_bioclim(daset, metadata, state, ras_names=False): 
+
+
+def load_bioclim(daset, metadata, state, ras_names=False):
 
     rasters = build.get_bioclim_rasters(state=state)
     pts = [Point(lon, lat) for lon, lat in zip(daset[metadata.loName], daset[metadata.latName])]
@@ -200,7 +200,7 @@ def load_bioclim(daset, metadata, state, ras_names=False):
         for j, (ras, transf,ras_name,_) in enumerate(rasters):
             curr_bio.append(ras[0,x,y])
         bioclim.append(curr_bio)
-        
+
     if ras_names:
         # raster item order is raster, transform, raster name, crs
         # eventually will turn into a datatype to make access cleaner
@@ -212,7 +212,7 @@ def load_bioclim(daset, metadata, state, ras_names=False):
 # ---------- Actual dataset class ---------- #
 
 class DeepbioDataset(TorchDataset):
-    
+
     def __init__(self, dataset_name, datatype, dataset_type, state, year, band, split, augment, prep_onehots=True):
 
         # load in observations & metadata
@@ -252,7 +252,7 @@ class DeepbioDataset(TorchDataset):
         self.ids = daset[metadata.idCol]
         # only relevant for cases where remote sensing data used
         self.augment = Augment[augment]
-        # split data 
+        # split data
         # if band is >=0, means to use the banding split
         # if band = -1, then use the uniform spatial split
         if split != 'all_points':
@@ -280,7 +280,7 @@ class DeepbioDataset(TorchDataset):
             self.specs = torch.tensor(daset.species_id.tolist())
             self.gens = torch.tensor(daset.genus_id.tolist())
             self.fams = torch.tensor(daset.family_id.tolist())
-        self.bioclim, self.raster_order = check_bioclim(daset, metadata, state)
+        self.bioclim, self.bioclim_order = check_bioclim(daset, metadata, state)
         self.nrasters = self.bioclim.shape[1]
         # finally, grab the files for reading the images
         self.imagekeys = daset[metadata.idCol].values
@@ -292,12 +292,12 @@ class DeepbioDataset(TorchDataset):
     def check_idx(self, df_idx):
         return df_idx in self.index
 
-    
+
     # idx should be a value from 0-N
     # where N is the length of the dataset
     # idx should not* be from the original
     # dataframe index
-    
+
     def batch_datatype(self, idx, input_):
         if self.dataset_type is DatasetType.SINGLE_LABEL:
             return self.specs[idx], self.gens[idx], self.fams[idx], input_
@@ -305,7 +305,7 @@ class DeepbioDataset(TorchDataset):
             return self.all_specs_single[idx], self.all_gens_single[idx], self.all_fams_single[idx], input_
         elif self.dataset_type is DatasetType.MULTI_SPECIES:
             return self.all_specs_multi[idx], self.all_gens_multi[idx], self.all_fams_multi[idx], input_
-    
+
     def __getitem__(self, idx):
 
         # bioclim only
@@ -338,13 +338,13 @@ class DeepbioDataset(TorchDataset):
 
 class OccurrenceDataset(TorchDataset):
 
-    
+
     def __init__(self, occ_daset, specCol, train_dset_name, datatype, dataset_type, state, year, band, split, augment, prep_onehots=True):
 
         # load in observations & metadata
-        
+
         metadata = load_metadata(train_dset_name)
-        
+
         self.band = f"band_{band}" if band >= 0 else 'unif_train_test'
         self.name = 'calflora'
         self.year = year
@@ -362,8 +362,8 @@ class OccurrenceDataset(TorchDataset):
         self.augment = Augment[augment]
         self.len_dset = len(daset)
         print(f"{split} dataset has {self.len_dset} points")
-        
-        
+
+
         #convert species to ID
         missing = set(occ_daset[specCol].tolist()) - set(meta.spec_2_id.keys())
         if len(missing) > 0:
@@ -373,28 +373,28 @@ class OccurrenceDataset(TorchDataset):
 
         self.idx_map = map_index(daset.index)
         self.index = daset.index
-    
+
         all_specs = []
         for spid in daset.ids:
             specs_tens = np.full((nspec), 0)
             specs_tens[spid] += 1
             all_specs.append(specs_tens)
-        
+
         self.all_specs_single = torch.tensor(np.stack(all_specs))
         self.specs = torch.tensor(daset.ids.tolist())
-        
+
         # pre-compute bioclim at each lat/lon
         rasters = build.get_bioclim_rasters(state=state)
         occ_daset = build.add_bioclim(occ_daset, rasters)
         occ_daset = build.filter_raster_oob(occ_daset)
         self.bioclim = check_bioclim(daset, metadata, state)
         self.nrasters = self.bioclim.shape[1]
-        
-        # grab the scratch files 
+
+        # grab the scratch files
         # for each image so they can be opened on the fly
         self.tiff_dset_name = f"{state}_100cm_{year}" if str(year) in ['2012', '2014'] else f"{state}_060cm_{year}"
         self.daset = build.add_filenames(occ_daset, state, year, self.tiff_dset_name, 'idCol')
-        
+
 
     def __len__(self):
         return self.len_dset
@@ -402,7 +402,7 @@ class OccurrenceDataset(TorchDataset):
     def check_idx(self, df_idx):
         return df_idx in self.index
 
-    
+
     # idx should be a value from 0-N
     # where N is the length of the dataset
     # idx should not* be from the original
@@ -416,7 +416,7 @@ class OccurrenceDataset(TorchDataset):
             return self.all_specs_single[idx], input_
         elif self.dataset_type is DatasetType.MULTI_SPECIES:
             raise ValueError('Multi-label training not implemented for this dataset')
-    
+
     def load_naip(self, idx):
 
         row = daset.iloc[idx]
@@ -424,7 +424,7 @@ class OccurrenceDataset(TorchDataset):
         fpath = f"naip/{self.year}/{tiff_dset_name}/{apfo[:5]}/{row[f'corr_filename_{self.year}']}"
         fullpath = f"{paths.SCRATCH}{fpath}"
         src = rasterio.open(fullpath)
-        
+
         # per-tif
         if int(str(src.crs).split(':')[-1]) != daset.crs.to_epsg():
             daset = daset.to_crs(src.crs)
@@ -436,7 +436,7 @@ class OccurrenceDataset(TorchDataset):
         # read data from a 256x256 window centered on observation
         image_crop = src.read(window=Window(yy-128, xx-128, 256, 256))
         return image_crop
-    
+
     def __getitem__(self, idx):
 
         # bioclim only

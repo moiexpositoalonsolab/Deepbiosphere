@@ -104,7 +104,7 @@ def make_config(args, train_dset, shared_species):
     args.shared_species = shared_species
     # TODO: change to match pretraining (if applicable)
     args.image_stats = f'naip_{args.year}'
-    args.raster_order = train_dset.raster_order
+    args.bioclim_order = train_dset.bioclim_order
     # save arguments
     path = f"{paths.MODELS}configs/{args.model}_{args.loss}_band{args.band}_{args.exp_id}.json"
     # if this is the first time building the config directory
@@ -118,7 +118,7 @@ def make_config(args, train_dset, shared_species):
 
 
 def save_model(model, optimizer, epoch, args, steps):
-    
+
     model_path= f"{paths.MODELS}{args.model}_{args.loss}/{args.exp_id}_lr{str(args.lr).split('.')[-1]}_e{epoch}.tar"
 
     # if this is the first time building the model directory
@@ -491,7 +491,7 @@ def train_model(args, rng):
     loss = instantiate_loss(args, train_dset, device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    
+
     # set up summary writer using standard tensorboard logging directory format
     log_dir = f"{paths.RUNS}/{datetime.now().strftime('%Y_%m_%d_%H-%M-%S')}_{socket.gethostname()}_"
     tb_writer = None if args.testing else SummaryWriter(log_dir=log_dir, comment=f"{args.exp_id}_allpoints")
@@ -513,7 +513,7 @@ def train_model(args, rng):
         model.train()
         steps, optimizer, model = train_one_epoch(model, train_loader, optimizer, loss, args, device, steps, tbwriter=tb_writer)
         save_model(model, optimizer, epoch, args, steps)
-        
+
 
     end = time.time()
     total = (end-start)/3600

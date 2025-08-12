@@ -54,14 +54,14 @@ from types import SimpleNamespace
 
 def calculate_extra_attributes_parallel(procid,
                                         lock,
-                                        files, 
+                                        files,
                                         save_dir,
                                         pred_types,
                                         alpha_type,
                                         loss_type,
                                        pred_specs : List[str],
                                        overwrite : bool =False):
-    
+
     with lock:
         prog = tqdm(total=len(files), desc=f"Extra attributes tiff group #{procid}", unit=' tiffs', position=procid)
     for file in files:
@@ -70,9 +70,9 @@ def calculate_extra_attributes_parallel(procid,
             prog.update(1)
     with lock:
         prog.close()
-    
-            
-def calculate_extra_attributes(file, 
+
+
+def calculate_extra_attributes(file,
                                save_dir,
                                pred_types,
                                alpha_type,
@@ -99,7 +99,7 @@ def calculate_extra_attributes(file,
         if not overwrite:
             if naip.check_file_exists(save_dir, save_name, pred_type.value):
                 continue
-                
+
         if pred_type is naip.Prediction.PER_SPEC:
             naip.save_tiff_per_species(save_dir=save_dir,
                                       save_name=save_name,
@@ -113,9 +113,9 @@ def calculate_extra_attributes(file,
                                       spec_names=spec_names,
                                       pred_specs=pred_specs,
                                       overwrite=overwrite)
-            
-                    
-            
+
+
+
         # Generate alpha diversity from species predictions
         elif pred_type is naip.Prediction.ALPHA:
             # prevent modification of
@@ -164,7 +164,7 @@ def additional_attributes_pertiff(parent_dir : str,
                                 epoch : int,
                                 processes : int,
                                 loss_type : str,
-                                pred_types : List[str] = ['RAW'], 
+                                pred_types : List[str] = ['RAW'],
                                 alpha_type : str = 'SUM',
                                 resolution : int = utils.IMG_SIZE,
                                 pred_specs : List[str]=None,
@@ -187,25 +187,25 @@ def additional_attributes_pertiff(parent_dir : str,
         pool.join()
     else:
         for file in tqdm(files, total=len(files), desc=f"Extra attributes ", unit=' tiffs'):
-            calculate_extra_attributes(file=file, 
+            calculate_extra_attributes(file=file,
                                        save_dir=save_dir,
                                        pred_types=pred_types,
                                        alpha_type=alpha_type,
                                        loss_type=loss_type,
                                        pred_specs=pred_specs,
                                       overwrite=overwrite)
-    
-        
-    
+
+
+
 # ---------- driver code ---------- #
 
-def predict_rasters_serial(rasters : List[str], 
+def predict_rasters_serial(rasters : List[str],
                            parent_dir : str,
                            model_config : SimpleNamespace,
                            device_no : int,
                            batch_size : int,
                            epoch : int,
-                           pred_year : int, 
+                           pred_year : int,
                            pred_types : List[str] = ['RAW'],
                            alpha_type : str = 'SUM',
                            resolution : int = utils.IMG_SIZE,
@@ -223,7 +223,7 @@ def predict_rasters_serial(rasters : List[str],
     if resolution < 20:
         raise ValueError("resolution needs to be at least 20 for model to work!")
 
-    model = run.load_model(device, model_config, epoch, logging=False) 
+    model = run.load_model(device, model_config, epoch, logging=False)
     model = model.to(device)
     # don't forget eval mode
     model.eval()
@@ -236,36 +236,36 @@ def predict_rasters_serial(rasters : List[str],
         save_name = f"{raster.split('/')[-1].split('.')[0]}_{str(pred_year)}"
         raster = rasterio.open(raster)
         # make subdir if it doesn't exist
-        # if the parent directory doesn't 
+        # if the parent directory doesn't
         # exist, will fail to prevent creating
         # a directory in an unwanted place
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
         # and now predict that raster
-        results.append(naip.predict_raster(raster, 
-                       save_dir, 
-                       save_name, 
-                       model, 
-                       model_config, 
-                       device, 
-                       batch_size, 
-                       pred_types, 
+        results.append(naip.predict_raster(raster,
+                       save_dir,
+                       save_name,
+                       model,
+                       model_config,
+                       device,
+                       batch_size,
+                       pred_types,
                        alpha_type,
-                       resolution, 
-                       img_size, 
-                       impute_climate, 
+                       resolution,
+                       img_size,
+                       impute_climate,
                        clim_rasters=clim_rasters,
                        sat_res = sat_res,
                        disable_tqdm = True,
                        pred_specs =pred_specs))
     return results
-    
-    
+
+
 ## parallelized version of taking list of rasters and splitting up
 # with parallel implemented etc.
 def predict_rasters_parallel(procid : int,
                              lock : multiprocessing.Manager,
-                             rasters : List[str], 
+                             rasters : List[str],
                              parent_dir : str,
                              model_config : SimpleNamespace,
                              device_no : int,
@@ -291,14 +291,14 @@ def predict_rasters_parallel(procid : int,
     if resolution < 20:
         raise ValueError("resolution needs to be at least 20 for model to work!")
 
-    model = run.load_model(device, model_config, epoch, logging=False) 
+    model = run.load_model(device, model_config, epoch, logging=False)
     model = model.to(device)
     # don't forget eval mode
     model.eval()
     # set up TQDM for parallel
     with lock:
         prog = tqdm(total=len(rasters), desc=f"{pred_year} tiffs group #{procid}", unit=' tiffs', position=procid)
-    files = []  
+    files = []
     for i, raster in enumerate(rasters):
         # get the subdirectory where to save this image
         subdir = raster.split('/')[-2]
@@ -306,33 +306,33 @@ def predict_rasters_parallel(procid : int,
         save_name = f"{raster.split('/')[-1].split('.')[0]}_{str(pred_year)}"
         raster = rasterio.open(raster)
         # make subdir if it doesn't exist
-        # if the parent directory doesn't 
+        # if the parent directory doesn't
         # exist, will fail to prevent creating
         # a directory in an unwanted place
         if not os.path.isdir(save_dir):
             os.mkdir(save_dir)
         # and now predict that raster
-        files.append(naip.predict_raster(raster, 
-                       save_dir, 
-                       save_name, 
-                       model, 
-                       model_config, 
-                       device, 
-                       batch_size, 
-                       pred_types, 
+        files.append(naip.predict_raster(raster,
+                       save_dir,
+                       save_name,
+                       model,
+                       model_config,
+                       device,
+                       batch_size,
+                       pred_types,
                        alpha_type,
                        resolution,
-                       img_size, 
-                       impute_climate, 
+                       img_size,
+                       impute_climate,
                        clim_rasters=clim_rasters,
-                       disable_tqdm = True, 
+                       disable_tqdm = True,
                        sat_res = sat_res,
                        pred_specs = pred_specs))
         with lock:
             prog.update(1)
     with lock:
         prog.close()
-    
+
 
 def predict_rasters_list(pred_outline : gpd.GeoDataFrame,
                          pred_types : List[str],
@@ -386,17 +386,17 @@ def predict_rasters_list(pred_outline : gpd.GeoDataFrame,
         pool.join()
 
     else:
-        res_files = predict_rasters_serial(rasters=rasters, 
-                                      parent_dir=save_dir, 
-                                      model_config=cfg, 
-                                      device_no=device, 
-                                      batch_size=batch_size, 
-                                      epoch=epoch, 
+        res_files = predict_rasters_serial(rasters=rasters,
+                                      parent_dir=save_dir,
+                                      model_config=cfg,
+                                      device_no=device,
+                                      batch_size=batch_size,
+                                      epoch=epoch,
                                       pred_year=pred_year,
-                                      pred_types=pred_types, 
+                                      pred_types=pred_types,
                                       alpha_type = alpha_type,
-                                      resolution=pred_res, 
-                                      impute_climate=impute_climate, 
+                                      resolution=pred_res,
+                                      impute_climate=impute_climate,
                                       sat_res=sat_res,
                                       clim_rasters=clim_rasters,
                                       pred_specs=pred_specs)
@@ -406,7 +406,7 @@ def predict_rasters_list(pred_outline : gpd.GeoDataFrame,
 if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument('--shape_pth', type=str, help='relative path to location of shapely file storing tiffs to predict with', required=True)
-    args.add_argument('--parent_dir', type=str, help='what parent directory to save the tiffs in. Full path expansion is: {paths.RASTERS}/{parent_dir}/{file_name}', required=True) 
+    args.add_argument('--parent_dir', type=str, help='what parent directory to save the tiffs in. Full path expansion is: {paths.RASTERS}/{parent_dir}/{file_name}', required=True)
     args.add_argument('--pred_year', type=int, help='What year of imagery to make predictions with', default='2012')
     # https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
     args.add_argument('--pred_types', nargs = '+', help='What type/s of predictions to make', choices = naip.Prediction.valid(), default=['RAW'])
@@ -430,13 +430,13 @@ if __name__ == "__main__":
     args.add_argument('--add_preds', action='store_true', help="add additional prediction types instead of making new predictions")
     args.add_argument('--overwrite', action='store_true', help="whether to overwrite existing files when calculating additional attributes")
     args, _ = args.parse_known_args()
-  
+
     if args.processes > 1:
         multiprocessing.set_start_method('spawn')
     # load config
     cnn = {
         'exp_id': args.exp_id,
-        'band' : args.band, 
+        'band' : args.band,
         'loss': args.loss,
         'model': args.architecture
     }
@@ -471,7 +471,7 @@ if __name__ == "__main__":
                              state = args.state,
                              pred_year = args.pred_year,
                              device = args.device,
-                             n_processes = args.processes, 
+                             n_processes = args.processes,
                              batch_size = args.batch_size,
                              pred_res = args.pred_resolution,
                              sat_res = args.sat_resolution,

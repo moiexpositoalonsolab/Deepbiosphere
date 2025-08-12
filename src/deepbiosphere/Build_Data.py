@@ -50,6 +50,7 @@ def load_rasters(base_dir, timeframe='current', ras_name='wc_30s_current'):
     # TODO: don't rely on glob, sort independently!!
     # ras_paths = sorted(glob.glob(rasters))
     ras_paths = glob.glob(rasters)
+    # TODO: magic number for bioclim, make more general or remove
     if len(ras_paths) != 19:
         raise FileNotFoundError(f"only {len(ras_paths)} files found for {ras_name}!")
     return ras_paths
@@ -63,8 +64,8 @@ def sort_rasters(corr_order, to_sort):
             if sras.split('_')[-1] == curr:
                 sortedras.append(sras)
     return sortedras
-    
-    
+
+
 def get_bioclim_means(training_ras, shpfile, crs):
     means = []
     stds = []
@@ -87,7 +88,7 @@ def get_bioclim_means(training_ras, shpfile, crs):
 
 # TODO: turn rasters into data type instead of list
 def get_bioclim_rasters(base_dir=paths.RASTERS, train_dir=paths.RASTERS, ras_name='wc_30s_current', timeframe='current', crs=naip.CRS.BIOCLIM_CRS, state='ca'):
-    
+
     shpfile = naip.get_state_outline(state)
     # get current day rasters for adjusting means to training data
     training_ras = load_rasters(train_dir)
@@ -788,8 +789,8 @@ def filter_raster_oob(daset):
 
 # Basically copying code from below that returns back just the polygons for visualization
 def generate_split_polygons(lonmin=-125,
-                            lonmax=-114, 
-                            latmin=32, 
+                            lonmax=-114,
+                            latmin=32,
                             latmax=42.1,
                            bandwidth=1):
     # these are a box around california
@@ -828,11 +829,11 @@ def generate_split_polygons(lonmin=-125,
     return polys
 
 # make bands and exclusion zones
-def make_spatial_split(daset, latCol, 
-                       lonmin=-125, 
-                       lonmax=-114, 
-                       latmin=32, 
-                       latmax=42.1, 
+def make_spatial_split(daset, latCol,
+                       lonmin=-125,
+                       lonmax=-114,
+                       latmin=32,
+                       latmax=42.1,
                        bandwidth=1):
     # first, make sure we're in the right crs
     daset = daset.to_crs(naip.CRS.GBIF_CRS)
