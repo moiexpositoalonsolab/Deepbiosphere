@@ -51,7 +51,7 @@ CRS = SimpleNamespace(
     BIOCLIM_CRS ='EPSG:4326',
     NAIP_CRS_1 = 'EPSG:26911',
     NAIP_CRS_2 = 'EPSG:26910')
-    
+
 # legal types of predictions to make
 # on a set of rasters
 class Prediction(Enum, metaclass=utils.MetaEnum):
@@ -60,18 +60,18 @@ class Prediction(Enum, metaclass=utils.MetaEnum):
     PER_SPEC = 'per_species'
     ALPHA = 'alpha'
     BETA = 'beta'
-    
-    
+
+
 # ---------- alpha diversity function types ---------- #
 
 
 def alpha_thres(pred : torch.tensor, threshold=0.8):
     pred = pred >= threshold # binary threshold
     return pred.sum(axis=0) # sum across all species
-    
+
 def alpha_sum(pred : torch.tensor):
     # sum probability across all species
-    return pred.sum(axis=0) 
+    return pred.sum(axis=0)
 
 
 # ---------- Beta diversity convolution function types ---------- #
@@ -173,7 +173,7 @@ class Filter(utils.FuncEnum, metaclass=utils.MetaEnum):
     CENTRAL  = partial(central)
     COMBINED = partial(combined)
     LAPLACE  = partial(laplace)
-    
+
 # legal ways to aggregate beta predictions
 # across species
 class Aggregation(utils.FuncEnum, metaclass=utils.MetaEnum):
@@ -187,7 +187,7 @@ class Aggregation(utils.FuncEnum, metaclass=utils.MetaEnum):
 
 
 # ---------- alpha diversity calculation functions ---------- #
-    
+
 def predict_alpha(pred : np.array,
                   alpha_func : str = 'SUM'):
 
@@ -195,7 +195,7 @@ def predict_alpha(pred : np.array,
     alphn = Alpha[alpha_func]
     return alphn(pred)
 
-    
+
 # ---------- beta diversity calculation functions ---------- #
 
 # user's job to ensure filter function and perspecies are compatible
@@ -206,36 +206,36 @@ def predict_alpha(pred : np.array,
 # filter: one of the keys for the filter function, determines which convolutional filter to use
 # agg_name: one of the keys from the above aggregate_fns, determines which aggregation strategy to use
 # Remember, the first axis must be the species axis!
-def convolve(probas : torch.tensor, 
-             filt_size : Tuple[int,int] = (3,3), 
-             dist_name : str = 'L2', 
-             fil_name : str = 'COMBINED', 
-             agg_name : str = 'NORM', 
+def convolve(probas : torch.tensor,
+             filt_size : Tuple[int,int] = (3,3),
+             dist_name : str = 'L2',
+             fil_name : str = 'COMBINED',
+             agg_name : str = 'NORM',
              nodata=np.nan):
 
     # type check + get function
     agg_fn = Aggregation[agg_name]
     dist_fn = Distance[dist_name]
     filter_fn = Filter[fil_name]
-    
+
     height = probas.shape[1]
     width = probas.shape[2]
-    # generate results array. Will lose a few 
+    # generate results array. Will lose a few
     # pixels on the end due to convolution
     # -1 is to ensure last valid pixel captured
     rowbuffer, colbuffer = filt_size[0]-1, filt_size[1]-1
     nheight, nwidth = height-rowbuffer, width-colbuffer
     convo = np.full([nheight,nwidth], nodata, dtype=np.float64)
     # loop through
-    for i in range(nheight): 
-        for j in range(nwidth): 
+    for i in range(nheight):
+        for j in range(nwidth):
             # grab all neighboring pixels
             wind = probas[:, i:i+filt_size[0], j:j+filt_size[1]]
-            # and calculate neighborhood distance 
+            # and calculate neighborhood distance
             convo[i,j] = filter_fn(wind, dist_fn, agg_fn)
     return convo
 
-# wrap convolve with rasterio handling    
+# wrap convolve with rasterio handling
 def predict_beta(preds, transform):
     if not torch.is_tensor(preds):
         pred = torch.tensor(preds)
@@ -251,10 +251,10 @@ def predict_beta(preds, transform):
     hig, wid = beta_pred.shape[0], beta_pred.shape[1]
     west,  north = rasterio.transform.xy(transform, [1],[1])
     east, south = rasterio.transform.xy(transform, [nheight],[nwidth])
-    transf = rasterio.transform.from_bounds(west[0], 
-                                            south[0], 
-                                            east[0], 
-                                            north[0], 
+    transf = rasterio.transform.from_bounds(west[0],
+                                            south[0],
+                                            east[0],
+                                            north[0],
                                             wid, hig)
     # get true resolution as well
     # resolution order according to rasterio
@@ -328,11 +328,11 @@ def get_climate(bioclim_rasters, bioclim_transf, bioclim_crs, affine, curr_col, 
         if (row >= bioclim_rasters.shape[1]) or (col >= bioclim_rasters.shape[2]) or (row < 0) or (col < 0):
             if impute_clim:
                 width, height = bioclim_rasters.shape[2], bioclim_rasters.shape[1]
-                # find and impute nearest 
+                # find and impute nearest
                 # unmasked climate pixel
                 res = impute_climate(bioclim_rasters, np.nan, 1, row,col, width, height)
             else:
-                # mask out missing values and 
+                # mask out missing values and
                 # convert to nan post-inference
                 # with return mask
                 nan_masks[i, :] = True
@@ -343,17 +343,17 @@ def get_climate(bioclim_rasters, bioclim_transf, bioclim_crs, affine, curr_col, 
         if (np.ma.is_masked(res[0]) or np.isnan(res[0])):
             if impute_clim:
                 width, height = bioclim_rasters.shape[2], bioclim_rasters.shape[1]
-                # find and impute nearest 
+                # find and impute nearest
                 # unmasked climate pixel
                 res = impute_climate(bioclim_rasters, np.nan, 1, row,col, width, height)
             else:
-                # mask out missing values and 
+                # mask out missing values and
                 # convert to nan post-inference
                 # with return mask
                 nan_masks[i, :] = True
-                
+
         clims[i,:] = res
-        
+
     return clims, nan_masks
 
 # recursive function to iteratively search
@@ -375,20 +375,20 @@ def impute_climate(arr, res, curr_diff, row, col, width, height):
     #size and check next-largest box
     return impute_climate(arr, res, curr_diff+1, row, col, width, height)
 
-    
+
 # ---------- raw prediction calculation using CNN model ---------- #
 
-def predict_model(dat, 
+def predict_model(dat,
             affine,
             crs,
             model,
-            batch_size, 
-            device, 
-            img_size, 
-            n_specs, 
-            res, 
-            means, 
-            std, 
+            batch_size,
+            device,
+            img_size,
+            n_specs,
+            res,
+            means,
+            std,
             save_name,
             use_climate=True,
             imclim=False,
@@ -399,7 +399,7 @@ def predict_model(dat,
             pred_specs=None,
             spec_names=None):
 
-    
+
     dwidth, dheight = dat.shape[2], dat.shape[1]
     # generate starting indices for data convolved to new resolution
     i_ind = list(range(0, dwidth, res))
@@ -415,14 +415,14 @@ def predict_model(dat,
     # make sure batching won't fall off image
     assert batch_size < hig, f"Batch ({batch_size}) should be < height {hig} (width: {wid})"
     # make receiver array
-    # dtype=np.float32 For now will try and see if default 
-    # float64 works. Some versions of GDAL only can work 
+    # dtype=np.float32 For now will try and see if default
+    # float64 works. Some versions of GDAL only can work
     # with float32 but we'll see
     result = np.full([n_specs, hig, wid],np.nan)
     if pred_specs is not None:
         # indices of preds will map to order of pred_specs
         mapping = {s: i for s, i in zip(spec_names, range(len(spec_names)))}
-        idxs = [mapping[i] for i in pred_specs] 
+        idxs = [mapping[i] for i in pred_specs]
     else:
         idxs = range(n_specs)
     # actually predict
@@ -439,7 +439,7 @@ def predict_model(dat,
             # also batch up start idxs in result array
             batched_rows = range(0, hig, batch_size)
             for j, curr_row in zip(batched_rows, chunked_rows):
-                
+
                 # grab each image at the resolution we prefer from image raster
                 imgs = [dat[:, c:c+img_size, curr_col:curr_col+img_size] for c in curr_row]
                 imgs = np.stack(imgs)
@@ -453,23 +453,23 @@ def predict_model(dat,
                 # method but this saves boilerplate
                 # so keeping for now
                 if use_climate:
-                    
+
                     clim, nans = get_climate(bioclim_rasters, bioclim_transf, bioclim_crs, affine, curr_col, curr_row, crs, imclim)
                     clim = torch.tensor(clim, dtype=torch.float)
                     clim = clim.to(device)
                     inputs = (imgs, clim)
                 else:
                     inputs = imgs
-                    
+
                 out = model(inputs)
                 # ignore genus and famliy prediction
                 # for deepbiosphere models
                 if isinstance(out, tuple):
                     # only take species prediction
-                    out = np.squeeze(out[0].detach().cpu().numpy())
+                    out = out[0].detach().cpu().numpy()
                 else:
-                    out = np.squeeze(out.detach().cpu().numpy())
-                
+                    out = out.detach().cpu().numpy() # new
+
                 # if using climate and masking missing climate, mask out missing
                 if use_climate:
                     nans = nans.sum(axis=1)
@@ -482,13 +482,13 @@ def predict_model(dat,
                 out = out.T
                 # filter to only species we want to keep
                 out = out[idxs,:]
-                result[:,j:j+batch_size,i] = out    
+                result[:,j:j+batch_size,i] = out
                 if not disable_tqdm:
                     prog.update(1)
-        
+
         if not disable_tqdm:
             prog.close()
-    
+
     west,  north = rasterio.transform.xy(affine, [0],[0])
     east, south = rasterio.transform.xy(affine, [nheight],[nwidth])
     transf = rasterio.transform.from_bounds(west[0], south[0], east[0], north[0], wid, hig)
@@ -513,11 +513,11 @@ def predict_raster(raster,
                 alpha_type : str = 'SUM',
                 resolution : int = utils.IMG_SIZE,
                 img_size : int = utils.IMG_SIZE, # TODO: change this to any number above 20 for standard convolutional approach
-                impute_climate: bool = True, 
+                impute_climate: bool = True,
                 clim_rasters : List = None,
                 disable_tqdm : bool = False,
                 sat_res : int = None, # resolution of satellite imagery for prediction, in meters
-                pred_specs : List[str] = None): 
+                pred_specs : List[str] = None):
 
     # typecheck prediction parameters
     pred_types = [Prediction[pred_type] for pred_type in pred_types]
@@ -525,7 +525,7 @@ def predict_raster(raster,
     # load in necessary metadata
     dset_metadata = dataset.load_metadata(model_config.dataset_name)
     # adding a new element to config which saves the training means used
-    # f"naip_{model_config.year}" 
+    # f"naip_{model_config.year}"
     means = dset_metadata.dataset_means[model_config.image_stats]['means']
     stds = dset_metadata.dataset_means[model_config.image_stats]['stds']
     # if resolution < 20:
@@ -533,7 +533,7 @@ def predict_raster(raster,
 
     spec_names = dataset.get_specnames(dset_metadata)
     n_specs = model_config.nspecs
-    
+
     use_climate = dataset.DataType[model_config.datatype] == dataset.DataType.JOINT_NAIP_BIOCLIM
     if (use_climate and (clim_rasters is None)):
         clim_rasters = build.get_bioclim_rasters(state=model_config.state)
@@ -567,20 +567,20 @@ def predict_raster(raster,
             raster = raster.read()
     else:
         raise ValueError(f"raster is invalid datatype! {raster}")
-        
+
     # otherwise read it from the open tiff
     # now get the actual predictions
-    pred, pred_aff, out_res, out_bounds = predict_model(dat=raster, 
-                                                affine=affine, 
+    pred, pred_aff, out_res, out_bounds = predict_model(dat=raster,
+                                                affine=affine,
                                                 crs=crs,
                                                 model=model,
-                                                batch_size=batch_size, 
-                                                device=device, 
-                                                img_size=img_size, 
-                                                n_specs=n_specs if pred_specs is None else len(pred_specs), 
-                                                res=resolution, 
-                                                means=means, 
-                                                std=stds, 
+                                                batch_size=batch_size,
+                                                device=device,
+                                                img_size=img_size,
+                                                n_specs=n_specs if pred_specs is None else len(pred_specs),
+                                                res=resolution,
+                                                means=means,
+                                                std=stds,
                                                 save_name=save_name,
                                                 use_climate=use_climate,
                                                 imclim=impute_climate,
@@ -590,7 +590,7 @@ def predict_raster(raster,
                                                 disable_tqdm=disable_tqdm,
                                                 pred_specs=pred_specs,
                                                 spec_names=spec_names if pred_specs is None else pred_specs)
-  
+
     files = []
     # convert to probabilities
     if not torch.is_tensor(pred):
@@ -618,7 +618,7 @@ def predict_raster(raster,
                                         spec_names=spec_names,
                                         pred_specs=pred_specs)
 
-            
+
         elif pred_type is Prediction.RAW:
             files.append(save_tiff(save_dir=save_dir,
                                 save_name=save_name,
@@ -634,17 +634,17 @@ def predict_raster(raster,
             model.encode = True
             num_feats = [f"{s}" for s in list(range(model_config.feature_extraction_dim))]
             n_feats = model_config.feature_extraction_dim # not species, but features
-            feats, feat_aff, feat_out_res, feat_out_bounds = predict_model(dat=raster, 
-                                    affine=affine, 
+            feats, feat_aff, feat_out_res, feat_out_bounds = predict_model(dat=raster,
+                                    affine=affine,
                                     crs=crs,
                                     model=model,
-                                    batch_size=batch_size, 
-                                    device=device, 
-                                    img_size=img_size, 
-                                    n_specs=n_feats, 
-                                    res=resolution, 
-                                    means=means, 
-                                    std=stds, 
+                                    batch_size=batch_size,
+                                    device=device,
+                                    img_size=img_size,
+                                    n_specs=n_feats,
+                                    res=resolution,
+                                    means=means,
+                                    std=stds,
                                     save_name=save_name,
                                     use_climate=use_climate,
                                     imclim=impute_climate,
@@ -706,7 +706,7 @@ def predict_raster(raster,
     return files
 
 # ---------- raster file saving utils ---------- #
-    
+
 def get_specs_from_files(files):
     # old, if file is per_species
     # file = files[0]
@@ -717,7 +717,7 @@ def get_specs_from_files(files):
     if isinstance(files[0], str):
         ras1 = rasterio.open(files[0])
         ras2 = rasterio.open(files[-1])
-    else: 
+    else:
         ras1 = files[0]
         ras2 = files[-1]
     specs = ras1.descriptions
@@ -725,7 +725,7 @@ def get_specs_from_files(files):
         return specs
     else:
         raise ValueError('band descriptions do not match across files!')
-        
+
 def save_tiff_per_species(save_dir,
                           save_name,
                           loss_type,
@@ -741,9 +741,9 @@ def save_tiff_per_species(save_dir,
 
     # make directory for each tif
     new_dir = f"{save_dir}{save_name}/"
-    
+
     # make subdir if it doesn't exist
-    # if the parent directory doesn't 
+    # if the parent directory doesn't
     # exist, will fail to prevent creating
     # a directory in an unwanted place
     if not os.path.isdir(new_dir):
@@ -768,12 +768,12 @@ def save_tiff_per_species(save_dir,
                 out_res=out_res,
                 bounds=bounds,
                 band_names=[spec.replace(' ', '_')]))
-        
+
 
     else:
-        # species lining up w/ indices in preds only holds if order of pred_specs        
+        # species lining up w/ indices in preds only holds if order of pred_specs
         if len(pred_specs) == preds.shape[0]: # coming in from predict_raster, already filtered to species
-            mapping = {s: i for s, i in zip(pred_specs, range(len(pred_specs)))} 
+            mapping = {s: i for s, i in zip(pred_specs, range(len(pred_specs)))}
         else: # coming in from save_tif_per_species, need to filter to index
             mapping = {s: i for s, i in zip(spec_names, range(len(spec_names)))}
         assert max(mapping.values()) < preds.shape[0], f"mappings are {max(mapping.values())} while predictions are {preds.shape[0]}"
@@ -795,32 +795,32 @@ def save_tiff_per_species(save_dir,
                 null_val=np.nan,
                 out_res=out_res,
                 bounds=bounds,
-                band_names=[spec.replace(' ', '_')]))    
+                band_names=[spec.replace(' ', '_')]))
     return files
-    
+
 
 def check_file_exists(save_dir, save_name, pred_type):
     # same as save_tiff
     fname = f"{save_dir}{save_name}_{pred_type}.tif"
     return os.path.isfile(fname)
 
-    
+
 def save_tiff(save_dir,
               save_name,
               pred_type,
-              preds, 
-              transf, 
-              crs, 
-              null_val, 
-              out_res, 
+              preds,
+              transf,
+              crs,
+              null_val,
+              out_res,
               bounds,
               band_names):
-    
+
     assert len(preds.shape) > 2, f"need to add bands axis! {preds.shape}"
-    
+
     width = preds.shape[2]
     height =  preds.shape[1]
-    
+
     out_profile = rasterio.profiles.DefaultGTiffProfile()
     out_profile['res'] = out_res
     out_profile['bounds'] = bounds
@@ -847,17 +847,17 @@ def save_tiff(save_dir,
 
 def merge_lots_of_tiffs(parent_dir, save_dir, pred_type, alpha_type='SUM', files=None, filelimit=1000, crs=CRS.NAIP_CRS_2,band_names=None,resolution=None, null_val=np.nan, spec=None):
 
-    
+
     if files is None:
         files = glob.glob(f"{paths.RASTERS}{parent_dir}/{save_dir}/*/*{pred_type}.tif")
         files = [f for f in files if ('fully_merged' not in f) or ('merging_temp' not in f)]
 
-        
+
     print(f"merging {len(files)} files")
     pred_type = Prediction[pred_type]
     alpha_type = Alpha[alpha_type]
     chunked_files = [files[i:i+filelimit] for i in range(0, len(files), filelimit)]
-    merged = [] 
+    merged = []
     for i, chunk in tqdm(enumerate(chunked_files), desc='merging chunks', unit=' tiff', total=len(chunked_files)):
         # read in files
         files = [rasterio.open(f) for f in chunk]
@@ -896,5 +896,5 @@ def merge_lots_of_tiffs(parent_dir, save_dir, pred_type, alpha_type='SUM', files
     dst_file = f"{dest_pth}{save_dir}_{pred_type.value}_merged.tif" if spec is None else f"{dest_pth}{save_dir}_{spec}_merged.tif"
     rasterio.merge.merge(meta_warp, dst_path=dst_file)
     return dst_file
-    
-    
+
+
