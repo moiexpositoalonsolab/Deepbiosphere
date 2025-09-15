@@ -67,11 +67,11 @@ class Change(utils.FuncEnum, metaclass=utils.MetaEnum):
     P_MASS  = partial(pmass_distance)
 
 # ---------- Change calculation ---------- #
-    
+
 def calculate_change(oldf, newf, start_year, end_year, change_fn, save_name=None):
     old = rasterio.open(oldf)
     new = rasterio.open(newf)
-    # get the interiors of the bounding boxes 
+    # get the interiors of the bounding boxes
     ob = naip.bounding_box_to_polygon(old.bounds)
     nb = naip.bounding_box_to_polygon(new.bounds)
     overlap = shp.geometry.box(*ob.intersection(nb).bounds)
@@ -79,7 +79,7 @@ def calculate_change(oldf, newf, start_year, end_year, change_fn, save_name=None
     xs, ys = overlap.exterior.coords.xy
     oldat = old.read(window=naip.get_window(old.transform, xs, ys))
     # this below relies on default nearest interpolation, could cause some errors
-    newdat = new.read(window=naip.get_window(new.transform, xs, ys), out_shape=oldat.shape) 
+    newdat = new.read(window=naip.get_window(new.transform, xs, ys), out_shape=oldat.shape)
     assert (oldat.shape[0] == newdat.shape[0]), f"shapes don't line up! {oldat.shape} vs {newdat.shape}"
     # A. check types
     change_fn = Change[change_fn]
@@ -112,7 +112,7 @@ def calculate_change_parallel(procid, lock, overlapping_ras, rasters_start, rast
             prog.update(1)
     with lock:
         prog.close()
-        
+
 
 # ---------- Driver code ---------- #
 
@@ -120,7 +120,8 @@ def calculate_change_parallel(procid, lock, overlapping_ras, rasters_start, rast
 # also add in taking differences and whatnot
 # Basically, takes the difference as seen before
 def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
-                        parent_dir : str,
+                        start_dir : str,
+                        end_dir : str,
                         pred_types : List[str],
                         alpha_type : str,
                         cfg : SimpleNamespace,
@@ -136,7 +137,8 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
                         change_fn = str,
                         sat_res : int = 1.0, # resolution to upsample sat imagery to, in meters
                         impute_climate = True,
-                        generate_preads=False):
+                        generate_preds=False,
+                        end_dir = None):
     if generate_preds:
         # get climate data first
         clim_rasters = build.get_bioclim_rasters(state=state)
@@ -146,7 +148,7 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
             pred_types.insert(0, naip.Prediction.RAW)
         start_ras = maps.predict_rasters_list(pred_outline=pred_outline,
                                     pred_types=pred_types,
-                                    parent_dir=parent_dir, 
+                                    parent_dir=start_dir,
                                     alpha_type = alpha_type,
                                     cfg=cfg,
                                     epoch=epoch,
@@ -163,7 +165,7 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
         # 2. predict rasters in end_year
         end_ras = maps.predict_rasters_list(pred_outline=pred_outline,
                                     pred_types=pred_types,
-                                    parent_dir=parent_dir, 
+                                    parent_dir=end_dir,
                                     alpha_type = alpha_type,
                                     cfg=cfg,
                                     epoch=epoch,
@@ -178,8 +180,8 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
                                     impute_climate=impute_climate,
                                     clim_rasters = clim_rasters)
     # 3. calculate change between the years
-    start_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{start_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
-    end_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{end_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
+    start_ras = glob.glob(f"{paths.RASTERS}{start_dir}/{pred_res}m_{start_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
+    end_ras = glob.glob(f"{paths.RASTERS}{end_dir}/{pred_res}m_{end_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
     rasters_start = {'_'.join(f.split('/')[-1].split('_')[:4]) : f for f in start_ras}
     rasters_end = {'_'.join(f.split('/')[-1].split('_')[:4]) : f for f in end_ras}
     # only keep rasters that match
@@ -199,18 +201,18 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
     else:
         for key in tqdm(overlapping_ras, total=len(overlapping_ras), desc=f"change tiffs", unit=' tiffs'):
             calculate_change(rasters_start[key], rasters_end[key], start_year, end_year, change_fn)
-            
+
 if __name__ == "__main__":
 
     args = argparse.ArgumentParser()
     args.add_argument('--shape_pth', type=str, help='relative path to location of shapely file storing tiffs to predict with', required=True)
     args.add_argument('--pred_types', nargs = '+', help='What type/s of predictions to make', choices = naip.Prediction.valid(), default=['RAW'])
-    args.add_argument('--parent_dir', type=str, help='what parent directory to save the tiffs in. Full path expansion is: {paths.RASTERS}{parent_dir}/{file_name}', required=True) 
+    args.add_argument('--start_dir', type=str, help='what parent directory start year tiffs are saved in. Full path expansion is: {paths.RASTERS}{start_dir}/{file_name}', required=True)
+    args.add_argument('--end_dir', type=str, help='what parent directory end year tffs are saved in, if different. Full path expansion is: {paths.RASTERS}{end_dir}/{file_name}', required=True)
     args.add_argument('--start_year', type=int, help='What year of imagery to make before prediction on', default=2012)
     args.add_argument('--end_year', type=int, help='What year of imagery to make after prediction on', default=2014)
     args.add_argument('--exp_id', type=str, help='Experiment ID for model to use for mapmaking', required=True)
     args.add_argument('--band', type=str, help='Band which model to use for mapmaking was trained on', required=True)
-    # TODO: change losses and models to enums as well
     args.add_argument('--loss', type=str, help='Loss function used to train mapmaking model', required=True, choices=run.LOSSES.keys())
     args.add_argument('--architecture', type=str, help='Architecture of mapmaking model', required=True, choices=run.MODELS.keys())
     args.add_argument('--epoch', type=int, help='what model epoch to use for making maps', required=True)
@@ -230,7 +232,7 @@ if __name__ == "__main__":
     # load config
     cnn = {
         'exp_id': args.exp_id,
-        'band' : args.band, 
+        'band' : args.band,
         'loss': args.loss,
         'model': args.architecture
     }
@@ -238,7 +240,8 @@ if __name__ == "__main__":
     # read in polygon
     bound_shp = gpd.read_file(f"{paths.SHPFILES}{args.shape_pth}")
     predict_raster_intime(pred_outline = bound_shp,
-                        parent_dir  = args.parent_dir,
+                        start_dir  = args.start_dir,
+                        end_dir = args.end_dir,
                         pred_types = args.pred_types,
                         alpha_type = args.alpha_type,
                         cfg  = cfg,
@@ -248,11 +251,11 @@ if __name__ == "__main__":
                         start_year = args.start_year,
                         end_year = args.end_year,
                         device = args.device,
-                        n_processes = args.processes, 
+                        n_processes = args.processes,
                         batch_size = args.batch_size,
                         pred_res = args.pred_resolution,
                         change_fn = args.change_fn,
                         sat_res = args.sat_resolution,
                         impute_climate = args.impute_climate,
                         generate_preds = args.generate_preds)
-    
+
