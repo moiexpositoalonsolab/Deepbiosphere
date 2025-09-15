@@ -139,53 +139,55 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
                         pred_res: int, # meter resolution of predictions to make with DBS
                         change_fn = str,
                         sat_res : int = 1.0, # resolution to upsample sat imagery to, in meters
-                        impute_climate = True):
-
-    # get climate data first
-    clim_rasters = build.get_bioclim_rasters(state=state)
-    # 1. predict rasters in start_year
-    pred_types = [naip.Prediction[pred_type] for pred_type in pred_types]
-    if naip.Prediction.RAW not in pred_types:
-        pred_types.insert(0, naip.Prediction.RAW)
-    start_ras = maps.predict_rasters_list(pred_outline=pred_outline,
-                                pred_types=pred_types,
-                                parent_dir=parent_dir, 
-                                alpha_type = alpha_type,
-                                cfg=cfg,
-                                epoch=epoch,
-                                band=band,
-                                state=state,
-                                pred_year=start_year,
-                                device=device,
-                                n_processes=n_processes, # whether to use parallel or not
-                                batch_size=batch_size,
-                                pred_res=pred_res, # meter resolution of predictions to make with DBS
-                                sat_res=sat_res, # resolution to upsample sat imagery to
-                                impute_climate=impute_climate,
-                                clim_rasters = clim_rasters)
-    # 2. predict rasters in end_year
-    end_ras = maps.predict_rasters_list(pred_outline=pred_outline,
-                                pred_types=pred_types,
-                                parent_dir=parent_dir, 
-                                alpha_type = alpha_type,
-                                cfg=cfg,
-                                epoch=epoch,
-                                band=band,
-                                state=state,
-                                pred_year=end_year,
-                                device=device,
-                                n_processes=n_processes, # whether to use parallel or not
-                                batch_size=batch_size,
-                                pred_res=pred_res, # meter resolution of predictions to make with DBS
-                                sat_res=sat_res, # resolution to upsample sat imagery to
-                                impute_climate=impute_climate,
-                                clim_rasters = clim_rasters)
+                        impute_climate = True,
+                        generate_preads=False):
+    if generate_preds:
+        # get climate data first
+        clim_rasters = build.get_bioclim_rasters(state=state)
+        # 1. predict rasters in start_year
+        pred_types = [naip.Prediction[pred_type] for pred_type in pred_types]
+        if naip.Prediction.RAW not in pred_types:
+            pred_types.insert(0, naip.Prediction.RAW)
+        start_ras = maps.predict_rasters_list(pred_outline=pred_outline,
+                                    pred_types=pred_types,
+                                    parent_dir=parent_dir, 
+                                    alpha_type = alpha_type,
+                                    cfg=cfg,
+                                    epoch=epoch,
+                                    band=band,
+                                    state=state,
+                                    pred_year=start_year,
+                                    device=device,
+                                    n_processes=n_processes, # whether to use parallel or not
+                                    batch_size=batch_size,
+                                    pred_res=pred_res, # meter resolution of predictions to make with DBS
+                                    sat_res=sat_res, # resolution to upsample sat imagery to
+                                    impute_climate=impute_climate,
+                                    clim_rasters = clim_rasters)
+        # 2. predict rasters in end_year
+        end_ras = maps.predict_rasters_list(pred_outline=pred_outline,
+                                    pred_types=pred_types,
+                                    parent_dir=parent_dir, 
+                                    alpha_type = alpha_type,
+                                    cfg=cfg,
+                                    epoch=epoch,
+                                    band=band,
+                                    state=state,
+                                    pred_year=end_year,
+                                    device=device,
+                                    n_processes=n_processes, # whether to use parallel or not
+                                    batch_size=batch_size,
+                                    pred_res=pred_res, # meter resolution of predictions to make with DBS
+                                    sat_res=sat_res, # resolution to upsample sat imagery to
+                                    impute_climate=impute_climate,
+                                    clim_rasters = clim_rasters)
     # 3. calculate change between the years
     start_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{start_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
     end_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{end_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
     rasters_start = {f.split('/')[-1].split("_201")[0] : f for f in start_ras}
     rasters_end = {f.split('/')[-1].split("_201")[0] : f for f in end_ras}
     # only keep rasters that match
+    # TODO: test this will work with 2016, 2018
     overlapping_ras = list(set(rasters_start.keys()) & set(rasters_end.keys()))
 
     if n_processes > 1:
@@ -226,6 +228,7 @@ if __name__ == "__main__":
     args.add_argument('--alpha_type', type = str, help='What type of alpha prediction to make', choices = naip.Alpha.valid(), default='SUM')
     args.add_argument('--processes', type=int, help="How many worker processes to use for mapmaking", default=1)
     args.add_argument('--impute_climate', action='store_true', help="whether to impute the climate for locations with no bioclim coverage")
+    args.add_argument('--generate_preds', action='store_true', help="whether to generate predictions for both years if not already done")
     args, _ = args.parse_known_args()
     if args.processes > 1:
         multiprocessing.set_start_method('spawn')
@@ -255,5 +258,6 @@ if __name__ == "__main__":
                         pred_res = args.pred_resolution,
                         change_fn = args.change_fn,
                         sat_res = args.sat_resolution,
-                        impute_climate = args.impute_climate)
+                        impute_climate = args.impute_climate,
+                        generate_preds = args.generate_preds)
     
