@@ -172,8 +172,7 @@ def additional_attributes_pertiff(parent_dir : str,
 
     # get raw predictions from file
     save_dir = f"{paths.RASTERS}{parent_dir}/{pred_res}m_{pred_year}_{band}_{exp_id}_{epoch}/"
-    files = glob.glob(f"{save_dir}*/*{naip.Prediction.RAW.value}.tif")
-    # files = glob.glob(f"{save_dir}*/*raw_spec.tif") # OLD TODO: remove!
+    files = glob.glob(f"{save_dir}*/*{naip.Prediction.RAW.value}.tif") 
     # otherwise read it from the open tiff
     # now get the actual predictions
     if processes > 1:
@@ -364,10 +363,14 @@ def predict_rasters_list(pred_outline : gpd.GeoDataFrame,
     scratch_res = "060" if pred_year >= 2016 else "100"
     imagery_dir = paths.SCRATCH+f"naip/{pred_year}/{cfg.state}_{scratch_res}cm_{pred_year}"
     rasters = naip.find_rasters_polygon(naip_shp, pred_outline.geometry.iloc[0], imagery_dir, pred_year)
+    nrasters = len(rasters)
     # if predictions already exist, ignore the pre-predicted files
     already_done = [r.split('/')[-1].split(f'_{pred_year}')[0] for r in glob.glob(f"{save_dir}*/*{naip.Prediction.RAW.value}.tif")]
     rasters = [r for r in rasters if r.split('/')[-1].split(f'_{pred_year}')[0] not in already_done]
     print(f"{len(already_done)} rasters completed, {len(rasters)} more to go")
+    if (len(rasters) == 0) and (len(already_done) == nrasters):
+        print(f"predictions done for {save_dir}!")
+        return already_done
     # load in climate rasters if necessary
     if clim_rasters == None:
         clim_rasters = build.get_bioclim_rasters(ras_name=cfg.clim_ras, train_dir=train_dir, timeframe=cfg.clim_time, state=cfg.state)
