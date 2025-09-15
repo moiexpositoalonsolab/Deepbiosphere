@@ -78,13 +78,9 @@ def calculate_change(oldf, newf, start_year, end_year, change_fn, save_name=None
     # generate intersecting window
     xs, ys = overlap.exterior.coords.xy
     oldat = old.read(window=naip.get_window(old.transform, xs, ys))
-    newdat = new.read(window=naip.get_window(new.transform, xs, ys))
+    # this below relies on default nearest interpolation, could cause some errors
+    newdat = new.read(window=naip.get_window(new.transform, xs, ys), out_shape=oldat.shape) 
     assert (oldat.shape[0] == newdat.shape[0]), f"shapes don't line up! {oldat.shape} vs {newdat.shape}"
-    # occasionally pixels will by off-by one, which we can just trim
-    assert abs(oldat.shape[1] - newdat.shape[1]) <= 1, f"shapes don't line up! {oldat.shape} vs {newdat.shape}"
-    assert abs(oldat.shape[2] - newdat.shape[2]) <= 1, f"shapes don't line up! {oldat.shape} vs {newdat.shape}"
-    oldat = oldat[:,:newdat.shape[1],:newdat.shape[2]]
-    newdat = newdat[:,:oldat.shape[1],:oldat.shape[2]]
     # A. check types
     change_fn = Change[change_fn]
     dist = change_fn(oldat, newdat)
@@ -184,10 +180,9 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
     # 3. calculate change between the years
     start_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{start_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
     end_ras = glob.glob(f"{paths.RASTERS}{parent_dir}/{pred_res}m_{end_year}_{band}_{cfg.exp_id}_{epoch}/*/*raw*.tif")
-    rasters_start = {f.split('/')[-1].split("_201")[0] : f for f in start_ras}
-    rasters_end = {f.split('/')[-1].split("_201")[0] : f for f in end_ras}
+    rasters_start = {'_'.join(f.split('/')[-1].split('_')[:4]) : f for f in start_ras}
+    rasters_end = {'_'.join(f.split('/')[-1].split('_')[:4]) : f for f in end_ras}
     # only keep rasters that match
-    # TODO: test this will work with 2016, 2018
     overlapping_ras = list(set(rasters_start.keys()) & set(rasters_end.keys()))
 
     if n_processes > 1:
