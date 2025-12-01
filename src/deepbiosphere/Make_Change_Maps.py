@@ -101,6 +101,8 @@ def calculate_change(oldf, newf, start_year, end_year, change_fn, save_name=None
     with rasterio.open(fname, 'w', **profile) as dst:
         dst.write(dist, range(1,2), masked=False)
         dst.descriptions = ['change']
+    old.close()
+    new.close()
     return fname
 
 
@@ -192,9 +194,19 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
     # only keep rasters that match
     overlapping_ras = list(set(rasters_start.keys()) & set(rasters_end.keys()))
 
+    nrasters = len(overlapping_ras)
+    # if predictions already exist, ignore the pre-predicted files
+    already_done = glob.glob(f"{paths.RASTERS}{start_dir}/{pred_res}m_{start_year}_{band}_{cfg.exp_id}_{epoch}/*/*{start_year}to{end_year}_change.tif")
+    already_done = set(['_'.join(a.split('/')[-1].split('_')[:4]) for a in already_done])
+    undone_ras = list(set(overlapping_ras) - already_done)
+    print(f"{len(already_done)} rasters completed, {len(undone_ras)} more to go")
+    if (len(undone_ras) == 0) and (len(already_done) == nrasters):
+        print(f"predictions done for {start_year} to {end_year}!")
+        return None
+
     if n_processes > 1:
         # set up parallel
-        ras_pars = utils.partition(overlapping_ras, n_processes)
+        ras_pars = utils.partition(undone_ras, n_processes)
         lock = multiprocessing.Manager().Lock()
         pool =  multiprocessing.Pool(n_processes)
 
@@ -204,7 +216,7 @@ def predict_raster_intime(pred_outline : gpd.GeoDataFrame,
         pool.join()
 
     else:
-        for key in tqdm(overlapping_ras, total=len(overlapping_ras), desc=f"change tiffs", unit=' tiffs'):
+        for key in tqdm(undone_ras, total=len(undone_ras), desc=f"change tiffs", unit=' tiffs'):
             calculate_change(rasters_start[key], rasters_end[key], start_year, end_year, change_fn)
 
 if __name__ == "__main__":

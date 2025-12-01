@@ -60,6 +60,7 @@ class Prediction(Enum, metaclass=utils.MetaEnum):
     PER_SPEC = 'per_species'
     ALPHA = 'alpha'
     BETA = 'beta'
+    CHANGE = 'change'
 
 
 # ---------- alpha diversity function types ---------- #
@@ -893,7 +894,8 @@ def merge_lots_of_tiffs(parent_dir, save_dir, pred_type, alpha_type='SUM', files
     dest_pth = f"{paths.RASTERS}{parent_dir}/{save_dir}/fully_merged/"
     if not os.path.isdir(dest_pth):
         os.mkdir(dest_pth)
-    dst_file = f"{dest_pth}{save_dir}_{pred_type.value}_merged.tif" if spec is None else f"{dest_pth}{save_dir}_{spec}_merged.tif"
+
+    dst_file = f"{dest_pth}{save_dir}_{pred_type.value}_merged.tif" if spec is None else f"{dest_pth}{save_dir}_{spec}_merged.tif" 
     rasterio.merge.merge(meta_warp, dst_path=dst_file)
     return dst_file
 
